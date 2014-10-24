@@ -2,6 +2,8 @@
 
 * Update links to new wai-middleware-static github/issue tracker.
 
+* Bump upper bound for `text`
+
 ## 0.6.0
 
 * Update to wai 3.0
