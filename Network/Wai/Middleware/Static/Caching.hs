@@ -1,16 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | Serve static files, subject to a policy that can filter or
---   modify incoming URIs. The flow is:
+--   modify incoming URIs. The flow is (depending on cache strategy):
 --
---   incoming request URI ==> policies ==> exists? ==> respond
+--   @
+--   incoming request URI ==> policies ==> exists? ==> cached?     ==> not modified
+--                                                     not cached? ==> respond
+--   @
 --
 --   If any of the polices fail, or the file doesn't
 --   exist, then the middleware gives up and calls the inner application.
 --   If the file is found, the middleware chooses a content type based
 --   on the file extension and returns the file contents as the response.
-module Network.Wai.Middleware.Static
+module Network.Wai.Middleware.Static.Caching
     ( -- * Middlewares
-      static, staticPolicy, unsafeStaticPolicy
+      static, staticPolicy, staticPolicy', unsafeStaticPolicy, unsafeStaticPolicy'
+    , -- * Cache Control
+      CachingStrategy(..), FileMeta(..)
     , -- * Policies
       Policy, (<|>), (>->), policy, predicate
     , addBase, addSlash, contains, hasPrefix, hasSuffix, noDots, isNotAbsolute, only
@@ -18,24 +23,45 @@ module Network.Wai.Middleware.Static
       tryPolicy
     ) where
 
+import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..), consistentDuration)
 import Control.Monad.Trans (liftIO)
-import qualified Data.ByteString as B
 import Data.List
-import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.Monoid
-import qualified Data.Text as T
-
-import Network.HTTP.Types (status200)
-import System.Directory (doesFileExist)
-import qualified System.FilePath as FP
-
+import Data.Time
+import Data.Time.Clock.POSIX
+import Network.HTTP.Types (status200, status304)
+import Network.HTTP.Types.Header (RequestHeaders)
 import Network.Wai
+import System.Directory (doesFileExist)
+import System.Locale
+import System.Posix.Files
+import qualified Crypto.Hash.SHA1 as SHA1
+import qualified Data.ByteString as B
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as BSC
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified System.FilePath as FP
 
 -- | Take an incoming URI and optionally modify or filter it.
 --   The result will be treated as a filepath.
 newtype Policy = Policy { tryPolicy :: String -> Maybe String -- ^ Run a policy
                         }
+
+-- | A cache strategy which should be used to
+-- serve content matching a policy. Meta information is cached for a maxium of
+-- 100 seconds before being recomputed.
+data CachingStrategy
+   -- | Do not send any caching headers
+   = NoCaching
+   -- | Send common caching headers for public (non dynamic) static files
+   | PublicStaticCaching
+   -- | Compute caching headers using the user specified function.
+   -- See <http://www.mobify.com/blog/beginners-guide-to-http-cache-headers/> for a detailed guide
+   | CustomCaching (FileMeta -> RequestHeaders)
 
 -- | Note:
 --   'mempty' == @policy Just@ (the always accepting policy)
@@ -113,31 +139,129 @@ only :: [(String,String)] -> Policy
 only al = policy (flip lookup al)
 
 -- | Serve static files out of the application root (current directory).
--- If file is found, it is streamed to the client and no further middleware is run.
+-- If file is found, it is streamed to the client and no further middleware is run. Disables caching.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
-static :: Middleware
+static :: IO Middleware
 static = staticPolicy mempty
 
--- | Serve static files subject to a 'Policy'
+-- | Serve static files subject to a 'Policy'. Disables caching.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
-staticPolicy :: Policy -> Middleware
-staticPolicy p = unsafeStaticPolicy $ noDots >-> isNotAbsolute >-> p
+staticPolicy :: Policy -> IO Middleware
+staticPolicy = staticPolicy' NoCaching
+
+-- | Serve static files subject to a 'Policy' using a specified 'CachingStrategy'
+--
+-- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+staticPolicy' :: CachingStrategy -> Policy -> IO Middleware
+staticPolicy' cs p = unsafeStaticPolicy' cs $ noDots >-> isNotAbsolute >-> p
 
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
--- has no policies enabled by default, and is hence insecure.
-unsafeStaticPolicy :: Policy -> Middleware
-unsafeStaticPolicy p app req callback =
+-- has no policies enabled by default, and is hence insecure. Disables caching.
+unsafeStaticPolicy :: Policy -> IO Middleware
+unsafeStaticPolicy = unsafeStaticPolicy' NoCaching
+
+-- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
+-- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
+unsafeStaticPolicy' :: CachingStrategy -> Policy -> IO Middleware
+unsafeStaticPolicy' cacheStrategy p =
+    do getFileMeta <- initializeFileMetaCache
+       return $ middlewareHook getFileMeta cacheStrategy p
+
+middlewareHook ::
+    (FilePath -> IO FileMeta)
+    -> CachingStrategy
+    -> Policy
+    -> (Request -> (Response -> IO b) -> IO b)
+    -> Request
+    -> (Response -> IO b)
+    -> IO b
+middlewareHook getFileMeta cs p app req callback =
     maybe (app req callback)
-          (\fp -> do exists <- liftIO $ doesFileExist fp
-                     if exists
-                        then callback $ responseFile status200
-                                                     [("Content-Type", getMimeType fp)]
-                                                     fp
-                                                     Nothing
-                        else app req callback)
+          (\fp ->
+               do exists <- liftIO $ doesFileExist fp
+                  if exists
+                  then case cs of
+                         NoCaching -> sendFile fp
+                         _ ->
+                             do wasNotModified <- checkNotModified fp (readHeader "If-Modified-Since") (readHeader "If-None-Match")
+                                if wasNotModified
+                                then sendNotModified fp
+                                else sendFile fp
+                  else app req callback)
           (tryPolicy p $ T.unpack $ T.intercalate "/" $ pathInfo req)
+    where
+      readHeader header =
+          lookup header $ requestHeaders req
+      checkNotModified fp modSince etag =
+           do fm <- getFileMeta fp
+              return $ or [ Just (fm_lastModified fm) == modSince
+                          , Just (fm_etag fm) == etag
+                          ]
+      computeHeaders fp =
+          case cs of
+            NoCaching -> return []
+            PublicStaticCaching ->
+                do fm <- getFileMeta fp
+                   return [ ("Cache-Control", "no-transform,public,max-age=300,s-maxage=900")
+                          , ("Last-Modified", fm_lastModified fm)
+                          , ("ETag", fm_etag fm)
+                          , ("Vary", "Accept-Encoding")
+                          ]
+            CustomCaching f ->
+                do fm <- getFileMeta fp
+                   return (f fm)
+      sendNotModified fp =
+          do cacheHeaders <- computeHeaders fp
+             callback $ responseLBS status304 cacheHeaders BSL.empty
+      sendFile fp =
+          do let basicHeaders =
+                     [ ("Content-Type", getMimeType fp)
+                     ]
+             cacheHeaders <- computeHeaders fp
+             let headers =
+                     basicHeaders ++ cacheHeaders
+             callback $ responseFile status200 headers fp Nothing
+
+-- | Meta information about a file to calculate cache headers
+data FileMeta
+   = FileMeta
+   { fm_lastModified :: !BS.ByteString
+   , fm_etag :: !BS.ByteString
+   , fm_fileName :: FilePath
+   } deriving (Show, Eq)
+
+initializeFileMetaCache :: IO (FilePath -> IO FileMeta)
+initializeFileMetaCache =
+    do let cacheAccess =
+               consistentDuration 100 $ \state fp ->
+                   do fileMeta <- computeFileMeta fp
+                      return $! (state, fileMeta)
+           cacheTick =
+               do time <- getPOSIXTime
+                  return (round (time * 100))
+           cacheFreq = 1
+           cacheLRU =
+               CacheWithLRUList 100 100 200
+       filecache <- newECMIO cacheAccess cacheTick cacheFreq cacheLRU
+       return (lookupECM filecache)
+
+computeFileMeta :: FilePath -> IO FileMeta
+computeFileMeta fp =
+    do mtime <- getModTime fp
+       ct <- BSL.readFile fp
+       return $ FileMeta
+                { fm_lastModified =
+                      BSC.pack $ formatTime defaultTimeLocale "%a, %d-%b-%Y %X %Z" mtime
+                , fm_etag = B16.encode (SHA1.hashlazy ct)
+                , fm_fileName = fp
+                }
+
+getModTime :: FilePath -> IO UTCTime
+getModTime fullFilePath =
+    do stat <- getFileStatus fullFilePath
+       return $ (\t -> posixSecondsToUTCTime (realToFrac t :: POSIXTime)) $ modificationTime stat
 
 type Ascii = B.ByteString
 
