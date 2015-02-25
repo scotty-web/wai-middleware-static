@@ -1,14 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | Serve static files, subject to a policy that can filter or
---   modify incoming URIs. The flow is:
+--   modify incoming URIs. The flow is (depending on cache strategy):
 --
---   incoming request URI ==> policies ==> exists? ==> respond
+--   @
+--   incoming request URI ==> policies ==> exists? ==> cached?     ==> not modified
+--                                                     not cached? ==> respond
+--   @
 --
 --   If any of the polices fail, or the file doesn't
 --   exist, then the middleware gives up and calls the inner application.
 --   If the file is found, the middleware chooses a content type based
 --   on the file extension and returns the file contents as the response.
-module Network.Wai.Middleware.Static
+module Network.Wai.Middleware.Static.Caching
     ( -- * Middlewares
       static, staticPolicy, staticPolicy', unsafeStaticPolicy, unsafeStaticPolicy'
     , -- * Cache Control

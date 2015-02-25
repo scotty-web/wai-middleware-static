@@ -1,27 +1,27 @@
-Name:                wai-middleware-static
-Version:             0.7.0.0
+Name:                wai-middleware-static-caching
+Version:             0.6.0.1
 Synopsis:            WAI middleware that serves requests to static files.
-Homepage:            https://github.com/scotty-web/wai-middleware-static
-Bug-reports:         https://github.com/scotty-web/wai-middleware-static/issues
+Homepage:            https://github.com/agrafix/wai-middleware-static
+Bug-reports:         https://github.com/agrafix/wai-middleware-static/issues
 License:             BSD3
 License-file:        LICENSE
-Author:              Andrew Farmer <afarmer@ittc.ku.edu>
-Maintainer:          Andrew Farmer <afarmer@ittc.ku.edu>
-Copyright:           (c) 2012-2014 Andrew Farmer
+Author:              Andrew Farmer <afarmer@ittc.ku.edu>, Alexander Thiemann <mail@athiemann.net>
+Maintainer:          Alexander Thiemann <mail@athiemann.net>
+Copyright:           (c) 2012-2014 Andrew Farmer, (c) 2015 Alexander Thiemann
 Category:            Web
 Stability:           experimental
 Build-type:          Simple
 Cabal-version:       >= 1.10
 Description:
+  Fork of wai-middleware-static introducing caching:
   WAI middleware that intercepts requests to static files and serves them
-  if they exist.
+  if they exist. Also implements caching strategies.
   .
   [WAI] <http://hackage.haskell.org/package/wai>
-
-Extra-source-files:    changelog.md
+  [wai-middleware-static] <http://hackage.haskell.org/package/wai-middleware-static>
 
 Library
-  Exposed-modules:     Network.Wai.Middleware.Static
+  Exposed-modules:     Network.Wai.Middleware.Static.Caching
   default-language:    Haskell2010
   Build-depends:
                        base             >= 4.6.0.1  && < 5,
@@ -44,4 +44,4 @@ Library
 
 source-repository head
   type:     git
-  location: git://github.com/scotty-web/wai-middleware-static.git
+  location: git://github.com/agrafix/wai-middleware-static.git
