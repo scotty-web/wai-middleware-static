@@ -10,9 +10,10 @@
 --   on the file extension and returns the file contents as the response.
 module Network.Wai.Middleware.Static
     ( -- * Middlewares
-      static, staticPolicy, staticPolicy', unsafeStaticPolicy, unsafeStaticPolicy'
+      static, staticPolicy, unsafeStaticPolicy
+    , static', staticPolicy', unsafeStaticPolicy'
     , -- * Cache Control
-      CachingStrategy(..), FileMeta(..)
+      CachingStrategy(..), FileMeta(..), initCaching, CacheContainer
     , -- * Policies
       Policy, (<|>), (>->), policy, predicate
     , addBase, addSlash, contains, hasPrefix, hasSuffix, noDots, isNotAbsolute, only
@@ -139,87 +140,88 @@ only al = policy (flip lookup al)
 -- If file is found, it is streamed to the client and no further middleware is run. Disables caching.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
-static :: IO Middleware
+static :: Middleware
 static = staticPolicy mempty
+
+-- | Serve static files out of the application root (current directory).
+-- If file is found, it is streamed to the client and no further middleware is run. Allows a 'CachingStrategy'.
+--
+-- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+static' :: CacheContainer -> Middleware
+static' cc = staticPolicy' cc mempty
 
 -- | Serve static files subject to a 'Policy'. Disables caching.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
-staticPolicy :: Policy -> IO Middleware
-staticPolicy = staticPolicy' NoCaching
+staticPolicy :: Policy -> Middleware
+staticPolicy = staticPolicy' CacheContainerEmpty
 
 -- | Serve static files subject to a 'Policy' using a specified 'CachingStrategy'
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
-staticPolicy' :: CachingStrategy -> Policy -> IO Middleware
-staticPolicy' cs p = unsafeStaticPolicy' cs $ noDots >-> isNotAbsolute >-> p
+staticPolicy' :: CacheContainer -> Policy -> Middleware
+staticPolicy' cc p = unsafeStaticPolicy' cc $ noDots >-> isNotAbsolute >-> p
 
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
 -- has no policies enabled by default, and is hence insecure. Disables caching.
-unsafeStaticPolicy :: Policy -> IO Middleware
-unsafeStaticPolicy = unsafeStaticPolicy' NoCaching
+unsafeStaticPolicy :: Policy -> Middleware
+unsafeStaticPolicy = unsafeStaticPolicy' CacheContainerEmpty
 
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
 -- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
-unsafeStaticPolicy' :: CachingStrategy -> Policy -> IO Middleware
-unsafeStaticPolicy' cacheStrategy p =
-    do getFileMeta <- initializeFileMetaCache
-       return $ middlewareHook getFileMeta cacheStrategy p
-
-middlewareHook ::
-    (FilePath -> IO FileMeta)
-    -> CachingStrategy
+unsafeStaticPolicy' ::
+    CacheContainer
     -> Policy
-    -> (Request -> (Response -> IO b) -> IO b)
-    -> Request
-    -> (Response -> IO b)
-    -> IO b
-middlewareHook getFileMeta cs p app req callback =
+    -> Middleware
+unsafeStaticPolicy' cacheContainer p app req callback =
     maybe (app req callback)
           (\fp ->
                do exists <- liftIO $ doesFileExist fp
                   if exists
-                  then case cs of
-                         NoCaching -> sendFile fp
-                         _ ->
-                             do wasNotModified <- checkNotModified fp (readHeader "If-Modified-Since") (readHeader "If-None-Match")
-                                if wasNotModified
-                                then sendNotModified fp
-                                else sendFile fp
+                  then case cacheContainer of
+                         CacheContainerEmpty ->
+                             sendFile fp []
+                         CacheContainer _ NoCaching ->
+                             sendFile fp []
+                         CacheContainer getFileMeta strategy ->
+                             do fileMeta <- getFileMeta fp
+                                if checkNotModified fileMeta (readHeader "If-Modified-Since") (readHeader "If-None-Match")
+                                then sendNotModified fileMeta strategy
+                                else sendFile fp (computeHeaders fileMeta strategy)
                   else app req callback)
           (tryPolicy p $ T.unpack $ T.intercalate "/" $ pathInfo req)
     where
       readHeader header =
           lookup header $ requestHeaders req
-      checkNotModified fp modSince etag =
-           do fm <- getFileMeta fp
-              return $ or [ Just (fm_lastModified fm) == modSince
-                          , Just (fm_etag fm) == etag
-                          ]
-      computeHeaders fp =
+      checkNotModified fm modSince etag =
+          or [ Just (fm_lastModified fm) == modSince
+             , Just (fm_etag fm) == etag
+             ]
+      computeHeaders fm cs =
           case cs of
-            NoCaching -> return []
+            NoCaching -> []
             PublicStaticCaching ->
-                do fm <- getFileMeta fp
-                   return [ ("Cache-Control", "no-transform,public,max-age=300,s-maxage=900")
-                          , ("Last-Modified", fm_lastModified fm)
-                          , ("ETag", fm_etag fm)
-                          , ("Vary", "Accept-Encoding")
-                          ]
-            CustomCaching f ->
-                do fm <- getFileMeta fp
-                   return (f fm)
-      sendNotModified fp =
-          do cacheHeaders <- computeHeaders fp
+                [ ("Cache-Control", "no-transform,public,max-age=300,s-maxage=900")
+                , ("Last-Modified", fm_lastModified fm)
+                , ("ETag", fm_etag fm)
+                , ("Vary", "Accept-Encoding")
+                ]
+            CustomCaching f -> f fm
+      sendNotModified fm cs =
+          do let cacheHeaders = computeHeaders fm cs
              callback $ responseLBS status304 cacheHeaders BSL.empty
-      sendFile fp =
+      sendFile fp extraHeaders =
           do let basicHeaders =
                      [ ("Content-Type", getMimeType fp)
                      ]
-             cacheHeaders <- computeHeaders fp
-             let headers =
-                     basicHeaders ++ cacheHeaders
+                 headers =
+                     basicHeaders ++ extraHeaders
              callback $ responseFile status200 headers fp Nothing
+
+-- | Container caching file meta information. Create using 'initCaching'
+data CacheContainer
+    = CacheContainerEmpty
+    | CacheContainer (FilePath -> IO FileMeta) CachingStrategy
 
 -- | Meta information about a file to calculate cache headers
 data FileMeta
@@ -229,8 +231,9 @@ data FileMeta
    , fm_fileName :: FilePath
    } deriving (Show, Eq)
 
-initializeFileMetaCache :: IO (FilePath -> IO FileMeta)
-initializeFileMetaCache =
+-- | Initialize caching. This should only be done once per application launch.
+initCaching :: CachingStrategy -> IO CacheContainer
+initCaching cs =
     do let cacheAccess =
                consistentDuration 100 $ \state fp ->
                    do fileMeta <- computeFileMeta fp
@@ -242,7 +245,7 @@ initializeFileMetaCache =
            cacheLRU =
                CacheWithLRUList 100 100 200
        filecache <- newECMIO cacheAccess cacheTick cacheFreq cacheLRU
-       return (lookupECM filecache)
+       return (CacheContainer (lookupECM filecache) cs)
 
 computeFileMeta :: FilePath -> IO FileMeta
 computeFileMeta fp =
