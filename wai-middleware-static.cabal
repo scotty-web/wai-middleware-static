@@ -39,11 +39,6 @@ Library
                        time               >= 1.4      && < 1.6,
                        wai                >= 3.0.0    && < 3.1
 
-  if os(windows)
-    build-depends:     Win32              >= 2.1      && < 2.4
-  else
-    build-depends:     unix               >= 2.0      && < 2.8
-
   GHC-options: -Wall -fno-warn-orphans
 
 source-repository head

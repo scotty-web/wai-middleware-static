@@ -1,6 +1,6 @@
 ## 0.7.0.1
-* Fixed Windows build
-* Lower `unix` lower bounds to allow building with GHC 7.6
+* Fixed Windows build (by replacing `unix` dependency with equivalent `directory`
+  function)
 
 ## 0.7.0.0
 * Implement caching [agrafix]
