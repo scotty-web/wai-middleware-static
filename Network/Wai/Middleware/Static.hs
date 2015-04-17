@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP, OverloadedStrings #-}
 -- | Serve static files, subject to a policy that can filter or
 --   modify incoming URIs. The flow is:
 --
@@ -25,14 +25,18 @@ import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..),
 import Control.Monad.Trans (liftIO)
 import Data.List
 import Data.Maybe (fromMaybe)
+#if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid
+#endif
 import Data.Time
 import Data.Time.Clock.POSIX
 import Network.HTTP.Types (status200, status304)
 import Network.HTTP.Types.Header (RequestHeaders)
 import Network.Wai
 import System.Directory (doesFileExist)
+#if !(MIN_VERSION_time(1,5,0))
 import System.Locale
+#endif
 import System.Posix.Files
 import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString as B
