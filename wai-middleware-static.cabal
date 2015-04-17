@@ -1,5 +1,5 @@
 Name:                wai-middleware-static
-Version:             0.7.0.0
+Version:             0.7.0.1
 Synopsis:            WAI middleware that serves requests to static files.
 Homepage:            https://github.com/scotty-web/wai-middleware-static
 Bug-reports:         https://github.com/scotty-web/wai-middleware-static/issues
@@ -24,21 +24,21 @@ Library
   Exposed-modules:     Network.Wai.Middleware.Static
   default-language:    Haskell2010
   Build-depends:
-                       base             >= 4.6.0.1  && < 5,
-                       base16-bytestring >= 0.1 && < 0.2,
-                       bytestring       >= 0.10.0.2 && < 0.11,
-                       containers       >= 0.5.0.0  && < 0.6,
-                       cryptohash       >= 0.11     && < 0.12,
-                       directory        >= 1.2.0.1  && < 1.3,
-                       expiring-cache-map >= 0.0.5  && < 0.1,
-                       filepath         >= 1.3.0.1  && < 1.5,
-                       http-types       >= 0.8.2    && < 0.9,
-                       mtl              >= 2.1.2    && < 2.3,
-                       old-locale       >= 1.0      && < 1.1,
-                       text             >= 0.11.3.1 && < 1.3,
-                       time             >= 1.4      && < 1.6,
-                       unix             >= 2.7      && < 2.8,
-                       wai              >= 3.0.0    && < 3.1
+                       base               >= 4.6.0.1  && < 5,
+                       base16-bytestring  >= 0.1      && < 0.2,
+                       bytestring         >= 0.10.0.2 && < 0.11,
+                       containers         >= 0.5.0.0  && < 0.6,
+                       cryptohash         >= 0.11     && < 0.12,
+                       directory          >= 1.2.0.1  && < 1.3,
+                       expiring-cache-map >= 0.0.5    && < 0.1,
+                       filepath           >= 1.3.0.1  && < 1.5,
+                       http-types         >= 0.8.2    && < 0.9,
+                       mtl                >= 2.1.2    && < 2.3,
+                       old-locale         >= 1.0      && < 1.1,
+                       text               >= 0.11.3.1 && < 1.3,
+                       time               >= 1.4      && < 1.6,
+                       unix               >= 2.6      && < 2.8,
+                       wai                >= 3.0.0    && < 3.1
 
   GHC-options: -Wall -fno-warn-orphans
 

@@ -1,3 +1,6 @@
+## 0.7.0.1
+* Lower `unix` lower bounds to allow building with GHC 7.6
+
 ## 0.7.0.0
 * Implement caching [agrafix]
 * Include mp4 and ogv mime_types [DrBoolean]
