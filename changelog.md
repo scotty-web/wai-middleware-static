@@ -1,3 +1,8 @@
+## 0.7.0.0
+* Implement caching [agrafix]
+* Include mp4 and ogv mime_types [DrBoolean]
+* Dependency updates for ghc 7.10 [DougBurke]
+
 ## 0.6.0.1
 
 * Update links to new wai-middleware-static github/issue tracker.
