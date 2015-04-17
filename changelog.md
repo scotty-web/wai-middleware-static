@@ -1,4 +1,5 @@
 ## 0.7.0.1
+* Fixed Windows build
 * Lower `unix` lower bounds to allow building with GHC 7.6
 
 ## 0.7.0.0

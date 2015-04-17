@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, OverloadedStrings #-}
+{-# LANGUAGE CPP, ForeignFunctionInterface, OverloadedStrings #-}
 -- | Serve static files, subject to a policy that can filter or
 --   modify incoming URIs. The flow is:
 --
@@ -37,7 +37,6 @@ import System.Directory (doesFileExist)
 #if !(MIN_VERSION_time(1,5,0))
 import System.Locale
 #endif
-import System.Posix.Files
 import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString as B
 import qualified Data.ByteString as BS
@@ -47,6 +46,49 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified System.FilePath as FP
+
+#if defined(mingw32_HOST_OS)
+
+# if MIN_VERSION_base(4,7,0)
+import Data.Bits          ((.|.), finiteBitSize, unsafeShiftL)
+# else
+import Data.Bits          ((.|.), bitSize, unsafeShiftL)
+# endif
+import Data.Int           (Int32, Int64)
+import Data.Word          (Word64)
+import Foreign            (allocaBytes, peekByteOff)
+import System.IO.Error    (mkIOError, doesNotExistErrorType)
+import System.Win32.Types (BOOL, DWORD, LPCTSTR, LPVOID, withTString)
+
+# ifdef x86_64_HOST_ARCH
+# define CALLCONV ccall
+# else
+# define CALLCONV stdcall
+# endif
+
+foreign import CALLCONV "windows.h GetFileAttributesExW"
+  c_getFileAttributesEx :: LPCTSTR -> Int32 -> LPVOID -> IO BOOL
+
+getFileAttributesEx :: String -> LPVOID -> IO BOOL
+getFileAttributesEx path lpFileInformation =
+  withTString path $ \c_path ->
+      c_getFileAttributesEx c_path getFileExInfoStandard lpFileInformation
+
+getFileExInfoStandard :: Int32
+getFileExInfoStandard = 0
+
+size_WIN32_FILE_ATTRIBUTE_DATA :: Int
+size_WIN32_FILE_ATTRIBUTE_DATA = 36
+
+index_WIN32_FILE_ATTRIBUTE_DATA_ftLastWriteTime_dwLowDateTime :: Int
+index_WIN32_FILE_ATTRIBUTE_DATA_ftLastWriteTime_dwLowDateTime = 20
+
+index_WIN32_FILE_ATTRIBUTE_DATA_ftLastWriteTime_dwHighDateTime :: Int
+index_WIN32_FILE_ATTRIBUTE_DATA_ftLastWriteTime_dwHighDateTime = 24
+
+#else
+import System.Posix.Files
+#endif
 
 -- | Take an incoming URI and optionally modify or filter it.
 --   The result will be treated as a filepath.
@@ -263,9 +305,45 @@ computeFileMeta fp =
                 }
 
 getModTime :: FilePath -> IO UTCTime
-getModTime fullFilePath =
-    do stat <- getFileStatus fullFilePath
-       return $ (\t -> posixSecondsToUTCTime (realToFrac t :: POSIXTime)) $ modificationTime stat
+getModTime fullFilePath = do
+#if defined(mingw32_HOST_OS)
+  -- Copied from Distribution.Client.Compat.Time from cabal-install
+  modTime <- allocaBytes size_WIN32_FILE_ATTRIBUTE_DATA $ \info -> do
+    res <- getFileAttributesEx fullFilePath info
+    if not res
+      then do
+        let err = mkIOError doesNotExistErrorType
+                  "Distribution.Client.Compat.Time.getModTime"
+                  Nothing (Just fullFilePath)
+        ioError err
+      else do
+        dwLow  <- peekByteOff info
+                  index_WIN32_FILE_ATTRIBUTE_DATA_ftLastWriteTime_dwLowDateTime
+        dwHigh <- peekByteOff info
+                  index_WIN32_FILE_ATTRIBUTE_DATA_ftLastWriteTime_dwHighDateTime
+        return $! windowsTimeToPOSIXSeconds dwLow dwHigh
+  return $ (\t -> posixSecondsToUTCTime (realToFrac t :: POSIXTime)) modTime
+    where
+      windowsTimeToPOSIXSeconds :: DWORD -> DWORD -> Int64
+      windowsTimeToPOSIXSeconds dwLow dwHigh =
+        let wINDOWS_TICK      = 10000000
+            sEC_TO_UNIX_EPOCH = 11644473600
+# if MIN_VERSION_base(4,7,0)
+            qwTime = (fromIntegral dwHigh `unsafeShiftL` finiteBitSize dwHigh)
+                     .|. (fromIntegral dwLow)
+# else
+            qwTime = (fromIntegral dwHigh `unsafeShiftL` bitSize dwHigh)
+                     .|. (fromIntegral dwLow)
+# endif
+            res    = ((qwTime :: Word64) `div` wINDOWS_TICK)
+                     - sEC_TO_UNIX_EPOCH
+        -- TODO: What if the result is not representable as POSIX seconds?
+        -- Probably fine to return garbage.
+        in fromIntegral res
+#else
+  stat <- getFileStatus fullFilePath
+  return $ (\t -> posixSecondsToUTCTime (realToFrac t :: POSIXTime)) $ modificationTime stat
+#endif
 
 type Ascii = B.ByteString
 
