@@ -335,6 +335,7 @@ defaultMimeTypes = M.fromList [
   ( "wax"     , "audio/x-ms-wax"                    ),
   ( "wma"     , "audio/x-ms-wma"                    ),
   ( "wmv"     , "video/x-ms-wmv"                    ),
+  ( "woff"    , "application/font-woff"             ),
   ( "xbm"     , "image/x-xbitmap"                   ),
   ( "xml"     , "text/xml"                          ),
   ( "xpm"     , "image/x-xpixmap"                   ),
