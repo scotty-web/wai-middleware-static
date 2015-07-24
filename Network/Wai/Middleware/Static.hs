@@ -19,6 +19,8 @@ module Network.Wai.Middleware.Static
     , addBase, addSlash, contains, hasPrefix, hasSuffix, noDots, isNotAbsolute, only
     , -- * Utilities
       tryPolicy
+    , -- * MIME types
+      getMimeType
     ) where
 
 import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..), consistentDuration)
@@ -263,7 +265,8 @@ computeFileMeta fp =
 
 type Ascii = B.ByteString
 
-getMimeType :: FilePath -> Ascii
+-- | Guess MIME type from file extension
+getMimeType :: FilePath -> B.ByteString
 getMimeType = go . extensions
     where go [] = defaultMimeType
           go (ext:exts) = fromMaybe (go exts) $ M.lookup ext defaultMimeTypes
