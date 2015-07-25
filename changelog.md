@@ -1,3 +1,18 @@
+## 0.8.0
+* The `mime-types` library is now used to lookup MIME types from extensions.
+  As a result, some extensions now map to different MIME types. They are:
+
+  Extension | `wai-middleware-static`       | `mime-types` |
+  --------- | ----------------------------- | ------------ |
+  `class`   | `application/octet-stream`    | `application/java-vm`
+  `dtd`     | `text/xml`                    | `application/xml-dtd`
+  `jar`     | `application/x-java-archive`  | `application/java-archive`
+  `js`      | `text/javascript`             | `application/javascript`
+  `ogg`     | `application/ogg`             | `audio/ogg`
+  `ttf`     | `application/x-font-truetype` | `application/x-font-ttf`
+
+* Exposed `getMimeType` function [Shimuuar]
+
 ## 0.7.0.1
 * Fixed Windows build (by replacing `unix` dependency with equivalent `directory`
   function)
