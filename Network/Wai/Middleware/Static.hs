@@ -29,6 +29,7 @@ import Data.List
 #if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid
 #endif
+import Data.Semigroup (Semigroup(..))
 import Data.Time
 import Data.Time.Clock.POSIX
 import Network.HTTP.Types (status200, status304)
@@ -63,6 +64,11 @@ data CachingStrategy
    -- | Compute caching headers using the user specified function.
    -- See <http://www.mobify.com/blog/beginners-guide-to-http-cache-headers/> for a detailed guide
    | CustomCaching (FileMeta -> RequestHeaders)
+
+-- | Note:
+--   '(<>)' == @>->@ (policy sequencing)
+instance Semigroup Policy where
+    (<>) = (>->)
 
 -- | Note:
 --   'mempty' == @policy Just@ (the always accepting policy)
