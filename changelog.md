@@ -1,3 +1,6 @@
+## next
+* Added `Semigroup Policy` instance
+
 ## 0.8.0
 * The `mime-types` library is now used to lookup MIME types from extensions.
   As a result, some extensions now map to different MIME types. They are:
