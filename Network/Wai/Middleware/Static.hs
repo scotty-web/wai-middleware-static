@@ -68,14 +68,14 @@ data CachingStrategy
 -- | Note:
 --   '(<>)' == @>->@ (policy sequencing)
 instance Semigroup Policy where
-    (<>) = (>->)
+    p1 <> p2 = policy (maybe Nothing (tryPolicy p2) . tryPolicy p1)
 
 -- | Note:
 --   'mempty' == @policy Just@ (the always accepting policy)
 --   'mappend' == @>->@ (policy sequencing)
 instance Monoid Policy where
-    mempty = policy Just
-    mappend p1 p2 = policy (maybe Nothing (tryPolicy p2) . tryPolicy p1)
+    mempty  = policy Just
+    mappend = (<>)
 
 -- | Lift a function into a 'Policy'
 policy :: (String -> Maybe String) -> Policy
@@ -88,7 +88,7 @@ predicate p = policy (\s -> if p s then Just s else Nothing)
 -- | Sequence two policies. They are run from left to right. (Note: this is `mappend`)
 infixr 5 >->
 (>->) :: Policy -> Policy -> Policy
-(>->) = mappend
+(>->) = (<>)
 
 -- | Choose between two policies. If the first fails, run the second.
 infixr 4 <|>
