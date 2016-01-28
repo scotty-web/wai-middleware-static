@@ -27,7 +27,7 @@ import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..),
 import Control.Monad.Trans (liftIO)
 import Data.List
 #if !(MIN_VERSION_base(4,8,0))
-import Data.Monoid
+import Data.Monoid (Monoid(..))
 #endif
 import Data.Semigroup (Semigroup(..))
 import Data.Time
