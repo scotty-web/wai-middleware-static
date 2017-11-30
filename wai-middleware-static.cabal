@@ -43,7 +43,7 @@ Library
 
   GHC-options: -Wall -fno-warn-orphans
 
-  if impl(ghc == 7.8)
+  if impl(ghc >= 7.8) && impl(ghc < 7.10)
     -- Work around https://github.com/haskell-crypto/cryptonite/issues/207
     build-depends:     foundation >= 0.0.15
 
