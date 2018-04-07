@@ -1,3 +1,6 @@
+## next [????.??.??]
+* Remove unused test suite.
+
 ## 0.8.1
 * Add `Semigroup Policy` instance
 * Replace dependencies on `base16-bytestring` and `cryptohash` with the more
