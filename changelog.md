@@ -1,4 +1,4 @@
-## next [????.??.??]
+## 0.8.2 [2018.04.07]
 * Remove unused test suite.
 
 ## 0.8.1
