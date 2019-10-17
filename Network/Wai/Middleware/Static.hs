@@ -202,7 +202,7 @@ staticPolicy = staticPolicy' (cacheContainer defaultOptions)
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
 staticPolicy' :: CacheContainer -> Policy -> Middleware
-staticPolicy' cc p = unsafeStaticPolicy' (mimeTypes defaultOptions) cc $ noDots >-> isNotAbsolute >-> p
+staticPolicy' cc p = unsafeStaticPolicy' cc $ noDots >-> isNotAbsolute >-> p
 
 -- | Serve static files subject to a 'Policy' using specified 'Options'
 --
@@ -213,26 +213,22 @@ staticPolicyWithOptions options p = unsafeStaticPolicyWithOptions options $ noDo
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
 -- has no policies enabled by default and is hence insecure. Disables caching.
 unsafeStaticPolicy :: Policy -> Middleware
-unsafeStaticPolicy = unsafeStaticPolicy' (mimeTypes defaultOptions) (cacheContainer defaultOptions)
+unsafeStaticPolicy = unsafeStaticPolicy' (cacheContainer defaultOptions)
+
+-- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
+-- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
+unsafeStaticPolicy' :: CacheContainer -> Policy -> Middleware
+unsafeStaticPolicy' cc = unsafeStaticPolicyWithOptions (setCacheContainer cc defaultOptions)
 
 -- | Serve static files subject to a 'Policy'. Unlike 'staticWithOptions' and 'staticPolicyWithOptions',
 -- this has no policies enabled by default and is hence insecure. Takes 'Options'.
 unsafeStaticPolicyWithOptions :: Options -> Policy -> Middleware
-unsafeStaticPolicyWithOptions options = unsafeStaticPolicy' (mimeTypes options) (cacheContainer options)
-
--- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
--- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
-unsafeStaticPolicy' ::
-    (FilePath -> MimeType)
-    -> CacheContainer
-    -> Policy
-    -> Middleware
-unsafeStaticPolicy' getMimeTypeFn cc p app req callback =
+unsafeStaticPolicyWithOptions options p app req callback =
     maybe (app req callback)
           (\fp ->
                do exists <- liftIO $ doesFileExist fp
                   if exists
-                  then case cc of
+                  then case cacheContainer options of
                          CacheContainerEmpty ->
                              sendFile fp []
                          CacheContainer _ NoCaching ->
@@ -266,7 +262,7 @@ unsafeStaticPolicy' getMimeTypeFn cc p app req callback =
              callback $ responseLBS status304 cacheHeaders BSL.empty
       sendFile fp extraHeaders =
           do let basicHeaders =
-                     [ ("Content-Type", getMimeTypeFn fp)
+                     [ ("Content-Type", mimeTypes options fp)
                      ]
                  headers =
                      basicHeaders ++ extraHeaders
