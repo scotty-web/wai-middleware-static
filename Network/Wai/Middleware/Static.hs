@@ -66,8 +66,12 @@ data Options = Options { cacheContainer :: CacheContainer -- ^ Cache container t
 
 -- | Default options.
 --
--- 'cacheContainer' = 'CacheContainerEmpty' -- no caching
--- 'mimeTypes' = 'getMimeTypes' -- use 'defaultMimeLookup' from 'Network.Mime'
+-- @
+-- 'Options'
+-- { 'cacheContainer' = 'CacheContainerEmpty' -- no caching
+-- , 'mimeTypes'      = 'getMimeType'         -- use 'defaultMimeLookup' from 'Network.Mime'
+-- }
+-- @
 defaultOptions :: Options
 defaultOptions = Options { cacheContainer = CacheContainerEmpty, mimeTypes = getMimeType }
 
@@ -182,6 +186,7 @@ static = staticPolicy mempty
 -- If file is found, it is streamed to the client and no further middleware is run. Allows a 'CachingStrategy'.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+{-# DEPRECATED static' "Use 'staticWithOptions' instead." #-}
 static' :: CacheContainer -> Middleware
 static' cc = staticPolicy' cc mempty
 
@@ -201,6 +206,7 @@ staticPolicy = staticPolicy' (cacheContainer defaultOptions)
 -- | Serve static files subject to a 'Policy' using a specified 'CachingStrategy'
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+{-# DEPRECATED staticPolicy' "Use 'staticPolicyWithOptions' instead." #-}
 staticPolicy' :: CacheContainer -> Policy -> Middleware
 staticPolicy' cc p = unsafeStaticPolicy' cc $ noDots >-> isNotAbsolute >-> p
 
@@ -217,6 +223,7 @@ unsafeStaticPolicy = unsafeStaticPolicy' (cacheContainer defaultOptions)
 
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
 -- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
+{-# DEPRECATED unsafeStaticPolicy' "Use 'unsafeStaticPolicyWithOptions' instead." #-}
 unsafeStaticPolicy' :: CacheContainer -> Policy -> Middleware
 unsafeStaticPolicy' cc = unsafeStaticPolicyWithOptions (setCacheContainer cc defaultOptions)
 
