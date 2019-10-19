@@ -14,7 +14,7 @@ module Network.Wai.Middleware.Static
     , static', staticPolicy', unsafeStaticPolicy'
     , staticWithOptions, staticPolicyWithOptions, unsafeStaticPolicyWithOptions
     , -- * Options
-      Options, defaultOptions, cacheContainer, setCacheContainer, mimeTypes, setMimeTypes
+      Options(..), defaultOptions
     , -- * Cache Control
       CachingStrategy(..), FileMeta(..), initCaching, CacheContainer
     , -- * Policies
@@ -60,6 +60,8 @@ newtype Policy = Policy { tryPolicy :: String -> Maybe String -- ^ Run a policy
                         }
 
 -- | Options for 'staticWithOptions' 'Middleware'.
+--
+-- Options can be set using record syntax on 'defaultOptions' with the fields below.
 data Options = Options { cacheContainer :: CacheContainer -- ^ Cache container to use
                        , mimeTypes :: FilePath -> MimeType -- ^ Compute MimeType from file name
                        }
@@ -74,14 +76,6 @@ data Options = Options { cacheContainer :: CacheContainer -- ^ Cache container t
 -- @
 defaultOptions :: Options
 defaultOptions = Options { cacheContainer = CacheContainerEmpty, mimeTypes = getMimeType }
-
--- | Update cacheContainer of options.
-setCacheContainer :: CacheContainer -> Options -> Options
-setCacheContainer cc options = options { cacheContainer = cc }
-
--- | Update mimeTypes of options.
-setMimeTypes :: (FilePath -> MimeType) -> Options -> Options
-setMimeTypes mts options = options { mimeTypes = mts }
 
 -- | A cache strategy which should be used to
 -- serve content matching a policy. Meta information is cached for a maxium of
@@ -225,7 +219,7 @@ unsafeStaticPolicy = unsafeStaticPolicy' (cacheContainer defaultOptions)
 -- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
 {-# DEPRECATED unsafeStaticPolicy' "Use 'unsafeStaticPolicyWithOptions' instead." #-}
 unsafeStaticPolicy' :: CacheContainer -> Policy -> Middleware
-unsafeStaticPolicy' cc = unsafeStaticPolicyWithOptions (setCacheContainer cc defaultOptions)
+unsafeStaticPolicy' cc = unsafeStaticPolicyWithOptions (defaultOptions { cacheContainer = cc })
 
 -- | Serve static files subject to a 'Policy'. Unlike 'staticWithOptions' and 'staticPolicyWithOptions',
 -- this has no policies enabled by default and is hence insecure. Takes 'Options'.
