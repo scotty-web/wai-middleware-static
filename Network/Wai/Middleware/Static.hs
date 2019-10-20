@@ -14,7 +14,7 @@ module Network.Wai.Middleware.Static
     , static', staticPolicy', unsafeStaticPolicy'
     , staticWithOptions, staticPolicyWithOptions, unsafeStaticPolicyWithOptions
     , -- * Options
-      Options(..), defaultOptions
+      Options, cacheContainer, mimeTypes, defaultOptions
     , -- * Cache Control
       CachingStrategy(..), FileMeta(..), initCaching, CacheContainer
     , -- * Policies
