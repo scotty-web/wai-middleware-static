@@ -12,6 +12,9 @@ module Network.Wai.Middleware.Static
     ( -- * Middlewares
       static, staticPolicy, unsafeStaticPolicy
     , static', staticPolicy', unsafeStaticPolicy'
+    , staticWithOptions, staticPolicyWithOptions, unsafeStaticPolicyWithOptions
+    , -- * Options
+      Options, cacheContainer, mimeTypes, defaultOptions
     , -- * Cache Control
       CachingStrategy(..), FileMeta(..), initCaching, CacheContainer
     , -- * Policies
@@ -55,6 +58,24 @@ import qualified System.FilePath as FP
 --   The result will be treated as a filepath.
 newtype Policy = Policy { tryPolicy :: String -> Maybe String -- ^ Run a policy
                         }
+
+-- | Options for 'staticWithOptions' 'Middleware'.
+--
+-- Options can be set using record syntax on 'defaultOptions' with the fields below.
+data Options = Options { cacheContainer :: CacheContainer -- ^ Cache container to use
+                       , mimeTypes :: FilePath -> MimeType -- ^ Compute MimeType from file name
+                       }
+
+-- | Default options.
+--
+-- @
+-- 'Options'
+-- { 'cacheContainer' = 'CacheContainerEmpty' -- no caching
+-- , 'mimeTypes'      = 'getMimeType'         -- use 'defaultMimeLookup' from 'Network.Mime'
+-- }
+-- @
+defaultOptions :: Options
+defaultOptions = Options { cacheContainer = CacheContainerEmpty, mimeTypes = getMimeType }
 
 -- | A cache strategy which should be used to
 -- serve content matching a policy. Meta information is cached for a maxium of
@@ -145,7 +166,7 @@ isNotAbsolute = predicate $ not . FP.isAbsolute
 -- GET \"foo\/bar\" looks for \"\/home\/user\/files\/bar\"
 -- GET \"baz\/bar\" doesn't match anything
 --
-only :: [(String,String)] -> Policy
+only :: [(String, String)] -> Policy
 only al = policy (flip lookup al)
 
 -- | Serve static files out of the application root (current directory).
@@ -159,38 +180,56 @@ static = staticPolicy mempty
 -- If file is found, it is streamed to the client and no further middleware is run. Allows a 'CachingStrategy'.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+{-# DEPRECATED static' "Use 'staticWithOptions' instead." #-}
 static' :: CacheContainer -> Middleware
 static' cc = staticPolicy' cc mempty
+
+-- | Serve static files out of the application root (current directory).
+-- If file is found, it is streamed to the client and no further middleware is run. Takes 'Options'.
+--
+-- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+staticWithOptions :: Options -> Middleware
+staticWithOptions options = staticPolicyWithOptions options mempty
 
 -- | Serve static files subject to a 'Policy'. Disables caching.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
 staticPolicy :: Policy -> Middleware
-staticPolicy = staticPolicy' CacheContainerEmpty
+staticPolicy = staticPolicy' (cacheContainer defaultOptions)
 
 -- | Serve static files subject to a 'Policy' using a specified 'CachingStrategy'
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+{-# DEPRECATED staticPolicy' "Use 'staticPolicyWithOptions' instead." #-}
 staticPolicy' :: CacheContainer -> Policy -> Middleware
 staticPolicy' cc p = unsafeStaticPolicy' cc $ noDots >-> isNotAbsolute >-> p
 
+-- | Serve static files subject to a 'Policy' using specified 'Options'
+--
+-- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
+staticPolicyWithOptions :: Options -> Policy -> Middleware
+staticPolicyWithOptions options p = unsafeStaticPolicyWithOptions options $ noDots >-> isNotAbsolute >-> p
+
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
--- has no policies enabled by default, and is hence insecure. Disables caching.
+-- has no policies enabled by default and is hence insecure. Disables caching.
 unsafeStaticPolicy :: Policy -> Middleware
-unsafeStaticPolicy = unsafeStaticPolicy' CacheContainerEmpty
+unsafeStaticPolicy = unsafeStaticPolicy' (cacheContainer defaultOptions)
 
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
 -- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
-unsafeStaticPolicy' ::
-    CacheContainer
-    -> Policy
-    -> Middleware
-unsafeStaticPolicy' cacheContainer p app req callback =
+{-# DEPRECATED unsafeStaticPolicy' "Use 'unsafeStaticPolicyWithOptions' instead." #-}
+unsafeStaticPolicy' :: CacheContainer -> Policy -> Middleware
+unsafeStaticPolicy' cc = unsafeStaticPolicyWithOptions (defaultOptions { cacheContainer = cc })
+
+-- | Serve static files subject to a 'Policy'. Unlike 'staticWithOptions' and 'staticPolicyWithOptions',
+-- this has no policies enabled by default and is hence insecure. Takes 'Options'.
+unsafeStaticPolicyWithOptions :: Options -> Policy -> Middleware
+unsafeStaticPolicyWithOptions options p app req callback =
     maybe (app req callback)
           (\fp ->
                do exists <- liftIO $ doesFileExist fp
                   if exists
-                  then case cacheContainer of
+                  then case cacheContainer options of
                          CacheContainerEmpty ->
                              sendFile fp []
                          CacheContainer _ NoCaching ->
@@ -224,7 +263,7 @@ unsafeStaticPolicy' cacheContainer p app req callback =
              callback $ responseLBS status304 cacheHeaders BSL.empty
       sendFile fp extraHeaders =
           do let basicHeaders =
-                     [ ("Content-Type", getMimeType fp)
+                     [ ("Content-Type", mimeTypes options fp)
                      ]
                  headers =
                      basicHeaders ++ extraHeaders

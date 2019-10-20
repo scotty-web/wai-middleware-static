@@ -1,3 +1,7 @@
+## 0.8.3 [2019.10.14]
+* Add `Options`, `staticWithOptions`, `staticPolicyWithOptions`, and `unsafeStaticPolicyWithOptions`.
+* Parameterize Middleware with options allowing custom file name to MIME type mapping.
+
 ## 0.8.2 [2018.04.07]
 * Remove unused test suite.
 
