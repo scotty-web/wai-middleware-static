@@ -180,7 +180,10 @@ static = staticPolicy mempty
 -- If file is found, it is streamed to the client and no further middleware is run. Allows a 'CachingStrategy'.
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
-{-# DEPRECATED static' "Use 'staticWithOptions' instead." #-}
+{-# DEPRECATED static'
+    [ "Use 'staticWithOptions' instead. "
+    , "This function will be removed in the next major release."
+    ] #-}
 static' :: CacheContainer -> Middleware
 static' cc = staticPolicy' cc mempty
 
@@ -200,7 +203,10 @@ staticPolicy = staticPolicy' (cacheContainer defaultOptions)
 -- | Serve static files subject to a 'Policy' using a specified 'CachingStrategy'
 --
 -- Note: for security reasons, this uses the 'noDots' and 'isNotAbsolute' policy by default.
-{-# DEPRECATED staticPolicy' "Use 'staticPolicyWithOptions' instead." #-}
+{-# DEPRECATED staticPolicy'
+    [ "Use 'staticPolicyWithOptions' instead. "
+    , "This function will be removed in the next major release."
+    ] #-}
 staticPolicy' :: CacheContainer -> Policy -> Middleware
 staticPolicy' cc p = unsafeStaticPolicy' cc $ noDots >-> isNotAbsolute >-> p
 
@@ -217,7 +223,10 @@ unsafeStaticPolicy = unsafeStaticPolicy' (cacheContainer defaultOptions)
 
 -- | Serve static files subject to a 'Policy'. Unlike 'static' and 'staticPolicy', this
 -- has no policies enabled by default, and is hence insecure. Also allows to set a 'CachingStrategy'.
-{-# DEPRECATED unsafeStaticPolicy' "Use 'unsafeStaticPolicyWithOptions' instead." #-}
+{-# DEPRECATED unsafeStaticPolicy'
+    [ "Use 'unsafeStaticPolicyWithOptions' instead. "
+    , "This function will be removed in the next major release."
+    ] #-}
 unsafeStaticPolicy' :: CacheContainer -> Policy -> Middleware
 unsafeStaticPolicy' cc = unsafeStaticPolicyWithOptions (defaultOptions { cacheContainer = cc })
 
