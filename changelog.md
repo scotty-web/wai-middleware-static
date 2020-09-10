@@ -1,3 +1,6 @@
+## 0.9.0 [unreleased]
+* Only serve static files on `HEAD` or `GET` requests
+
 ## 0.8.3 [2019.10.20]
 * Add `Options`, `staticWithOptions`, `staticPolicyWithOptions`, and `unsafeStaticPolicyWithOptions`.
 * Parameterize Middleware with options allowing custom file name to MIME type mapping.
