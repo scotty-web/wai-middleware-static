@@ -27,7 +27,6 @@ module Network.Wai.Middleware.Static
     ) where
 
 import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..), consistentDuration)
-import Control.Monad.Trans (liftIO)
 import Control.Monad
 import Data.List
 #if !(MIN_VERSION_base(4,8,0))
@@ -241,7 +240,7 @@ unsafeStaticPolicyWithOptions options p app req callback =
 
       tryStaticFile :: FilePath -> IO ResponseReceived
       tryStaticFile fp = do
-          exists <- liftIO $ doesFileExist fp
+          exists <- doesFileExist fp
           if exists
                   then case cacheContainer options of
                          CacheContainerEmpty ->
