@@ -27,7 +27,7 @@ module Network.Wai.Middleware.Static
     ) where
 
 import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..), consistentDuration)
-import Control.Monad.Trans (liftIO)
+import Control.Monad
 import Data.List
 #if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid (Monoid(..))
@@ -37,8 +37,7 @@ import Data.Semigroup (Semigroup(..))
 #endif
 import Data.Time
 import Data.Time.Clock.POSIX
-import Network.HTTP.Types (status200, status304)
-import Network.HTTP.Types.Header (RequestHeaders)
+import Network.HTTP.Types
 import Network.Mime (MimeType, defaultMimeLookup)
 import Network.Wai
 import System.Directory (doesFileExist, getModificationTime)
@@ -56,7 +55,7 @@ import qualified System.FilePath as FP
 
 -- | Take an incoming URI and optionally modify or filter it.
 --   The result will be treated as a filepath.
-newtype Policy = Policy { tryPolicy :: String -> Maybe String -- ^ Run a policy
+newtype Policy = Policy { tryPolicy :: String -> Maybe FilePath -- ^ Run a policy
                         }
 
 -- | Options for 'staticWithOptions' 'Middleware'.
@@ -234,10 +233,15 @@ unsafeStaticPolicy' cc = unsafeStaticPolicyWithOptions (defaultOptions { cacheCo
 -- this has no policies enabled by default and is hence insecure. Takes 'Options'.
 unsafeStaticPolicyWithOptions :: Options -> Policy -> Middleware
 unsafeStaticPolicyWithOptions options p app req callback =
-    maybe (app req callback)
-          (\fp ->
-               do exists <- liftIO $ doesFileExist fp
-                  if exists
+    maybe serveUpstream tryStaticFile mCandidateFile
+    where
+      serveUpstream :: IO ResponseReceived
+      serveUpstream = app req callback
+
+      tryStaticFile :: FilePath -> IO ResponseReceived
+      tryStaticFile fp = do
+          exists <- doesFileExist fp
+          if exists
                   then case cacheContainer options of
                          CacheContainerEmpty ->
                              sendFile fp []
@@ -248,9 +252,19 @@ unsafeStaticPolicyWithOptions options p app req callback =
                                 if checkNotModified fileMeta (readHeader "If-Modified-Since") (readHeader "If-None-Match")
                                 then sendNotModified fileMeta strategy
                                 else sendFile fp (computeHeaders fileMeta strategy)
-                  else app req callback)
+                  else serveUpstream
+
+      mCandidateFile :: Maybe FilePath
+      mCandidateFile =
+          guard isHeadOrGet >>
           (tryPolicy p $ T.unpack $ T.intercalate "/" $ pathInfo req)
-    where
+          where
+            method :: Method
+            method = requestMethod req
+
+            isHeadOrGet :: Bool
+            isHeadOrGet = method == methodHead || method == methodGet
+
       readHeader header =
           lookup header $ requestHeaders req
       checkNotModified fm modSince etag =
