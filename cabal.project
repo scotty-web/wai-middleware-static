@@ -1,4 +1,1 @@
 packages: .
-
--- Work around https://github.com/kazu-yamamoto/iproute/issues/53
-constraints: iproute <1.7.10 || >1.7.10

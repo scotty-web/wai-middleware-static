@@ -136,8 +136,6 @@ jobs:
           if [ $((HCNUMVER >= 80200)) -ne 0 ] ; then echo "package wai-middleware-static" >> cabal.project ; fi
           if [ $((HCNUMVER >= 80200)) -ne 0 ] ; then echo "    ghc-options: -Werror=missing-methods" >> cabal.project ; fi
           cat >> cabal.project <<EOF
-          constraints: iproute <1.7.10 || >1.7.10
-
           package wai-middleware-static
             ghc-options: -Werror
           EOF
