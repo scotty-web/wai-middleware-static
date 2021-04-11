@@ -1,3 +1,6 @@
+## next [????.??.??]
+* Always import `Data.List` qualified to fix the build with recent GHCs.
+
 ## 0.9.0 [2020.10.01]
 * Only serve static files on `HEAD` or `GET` requests.
 

@@ -28,7 +28,7 @@ module Network.Wai.Middleware.Static
 
 import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..), consistentDuration)
 import Control.Monad
-import Data.List
+import qualified Data.List as L
 #if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid (Monoid(..))
 #endif
@@ -139,19 +139,19 @@ addSlash = policy slashOpt
 
 -- | Accept only URIs with given suffix
 hasSuffix :: String -> Policy
-hasSuffix = predicate . isSuffixOf
+hasSuffix = predicate . L.isSuffixOf
 
 -- | Accept only URIs with given prefix
 hasPrefix :: String -> Policy
-hasPrefix = predicate . isPrefixOf
+hasPrefix = predicate . L.isPrefixOf
 
 -- | Accept only URIs containing given string
 contains :: String -> Policy
-contains = predicate . isInfixOf
+contains = predicate . L.isInfixOf
 
 -- | Reject URIs containing \"..\"
 noDots :: Policy
-noDots = predicate (not . isInfixOf "..")
+noDots = predicate (not . L.isInfixOf "..")
 
 -- | Reject URIs that are absolute paths
 isNotAbsolute :: Policy
