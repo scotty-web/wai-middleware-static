@@ -1,3 +1,8 @@
+## next [????.??.??]
+* Allow building with GHC 9.2.
+* Replace the `cryptonite` and `memory` dependencies with equivalent
+  functionality from `cryptohash-sha1` and `base16-bytestring`.
+
 ## 0.9.1 [2021.10.31]
 * Always import `Data.List` qualified.
 
