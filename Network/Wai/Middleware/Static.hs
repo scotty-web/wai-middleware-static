@@ -28,6 +28,8 @@ module Network.Wai.Middleware.Static
 
 import Caching.ExpiringCacheMap.HashECM (newECMIO, lookupECM, CacheSettings(..), consistentDuration)
 import Control.Monad
+import qualified Crypto.Hash.SHA1 as SHA1
+import qualified Data.ByteString.Base16 as Base16
 import qualified Data.List as L
 #if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid (Monoid(..))
@@ -44,9 +46,9 @@ import System.Directory (doesFileExist, getModificationTime)
 #if !(MIN_VERSION_time(1,5,0))
 import System.Locale
 #endif
-import Crypto.Hash.Algorithms
-import Crypto.Hash
-import Data.ByteArray.Encoding
+-- import Crypto.Hash.Algorithms
+-- import Crypto.Hash
+-- import Data.ByteArray.Encoding
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy as BSL
@@ -328,7 +330,7 @@ computeFileMeta fp =
        return $ FileMeta
                 { fm_lastModified =
                       BSC.pack $ formatTime defaultTimeLocale "%a, %d-%b-%Y %X %Z" mtime
-                , fm_etag = convertToBase Base16 (hashlazy ct :: Digest SHA1)
+                , fm_etag = Base16.encode (SHA1.hashlazy ct)
                 , fm_fileName = fp
                 }
 
