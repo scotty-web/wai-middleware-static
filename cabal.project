@@ -1,6 +1,1 @@
 packages: .
-
-constraints:
-  -- Needed to allow GHC 8.0 to build the test suite
-  -- See https://github.com/haskell-foundation/foundation/issues/561
-  basement < 0.0.13 || > 0.0.13
