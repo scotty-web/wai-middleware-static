@@ -31,9 +31,6 @@ import Control.Monad
 import qualified Crypto.Hash.SHA1 as SHA1
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.List as L
-#if !(MIN_VERSION_base(4,8,0))
-import Data.Monoid (Monoid(..))
-#endif
 #if !(MIN_VERSION_base(4,11,0))
 import Data.Semigroup (Semigroup(..))
 #endif
@@ -43,9 +40,6 @@ import Network.HTTP.Types
 import Network.Mime (MimeType, defaultMimeLookup)
 import Network.Wai
 import System.Directory (doesFileExist, getModificationTime)
-#if !(MIN_VERSION_time(1,5,0))
-import System.Locale
-#endif
 -- import Crypto.Hash.Algorithms
 -- import Crypto.Hash
 -- import Data.ByteArray.Encoding

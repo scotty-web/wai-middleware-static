@@ -1,3 +1,6 @@
+## next [????.??.??]
+* Drop support for pre-8.0 versions of GHC.
+
 ## 0.9.2 [2022.03.08]
 * Allow building with GHC 9.2.
 * Replace the `cryptonite` and `memory` dependencies with equivalent
