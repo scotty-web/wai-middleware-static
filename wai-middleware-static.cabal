@@ -74,4 +74,4 @@ test-suite spec
 
 source-repository head
   type:     git
-  location: git://github.com/scotty-web/wai-middleware-static.git
+  location: https://github.com/scotty-web/wai-middleware-static.git
