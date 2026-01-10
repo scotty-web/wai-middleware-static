@@ -1,3 +1,6 @@
+## nexxt [????.??.??]
+* Remove unused `containers`, `old-locale`, and `semigroups` dependencies.
+
 ## 0.9.3 [2024.12.28]
 * Drop support for pre-8.0 versions of GHC.
 
