@@ -30,6 +30,7 @@ tested-with:         GHC == 8.0.2
                    , GHC == 9.8.4
                    , GHC == 9.10.3
                    , GHC == 9.12.2
+                   , GHC == 9.14.1
 Extra-source-files:  changelog.md, README.md
 
 Library
@@ -46,7 +47,7 @@ Library
                        http-types         >= 0.8.2    && < 0.13,
                        mime-types         >= 0.1.0.3  && < 0.2,
                        text               >= 0.11.3.1 && < 2.2,
-                       time               >= 1.6.0.1  && < 1.15,
+                       time               >= 1.6.0.1  && < 1.16,
                        wai                >= 3.0.0    && < 3.3
 
   GHC-options: -Wall -Wno-orphans

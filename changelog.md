@@ -1,4 +1,5 @@
 ## nexxt [????.??.??]
+* Allow building with `time-1.15.*` (GHC 9.14).
 * Remove unused `containers`, `old-locale`, and `semigroups` dependencies.
 
 ## 0.9.3 [2024.12.28]
