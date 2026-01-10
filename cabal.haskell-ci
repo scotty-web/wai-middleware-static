@@ -2,3 +2,5 @@ distribution:           jammy
 no-tests-no-benchmarks: False
 unconstrained:          False
 local-ghc-options:      -Werror
+-- Avoid picking a broken build plan with head.hackage.
+head-hackage-override:  False
