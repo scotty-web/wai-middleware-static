@@ -264,9 +264,23 @@ unsafeStaticPolicyWithOptions options p app req callback =
       readHeader header =
           lookup header $ requestHeaders req
       checkNotModified fm modSince etag =
-          or [ Just (fm_lastModified fm) == modSince
-             , Just (fm_etag fm) == etag
-             ]
+          case etag of
+            Just value ->
+                let candidate = trimOWS value
+                in candidate == "*" || stripWeak candidate == stripWeak (fm_etag fm)
+            Nothing ->
+                case (parseHttpDate (fm_lastModified fm), modSince >>= parseHttpDate) of
+                  (Just modified, Just since) -> modified <= since
+                  _ -> False
+      -- Only modern HTTP dates (IMF-fixdate); obsolete formats are not parsed here.
+      parseHttpDate :: BS.ByteString -> Maybe UTCTime
+      parseHttpDate = parseTimeM True defaultTimeLocale
+          "%a, %d %b %Y %H:%M:%S GMT" . BSC.unpack
+      stripWeak value
+          | "W/" `BS.isPrefixOf` value = BS.drop 2 value
+          | otherwise = value
+      trimOWS = fst . BSC.spanEnd isOWS . BSC.dropWhile isOWS
+          where isOWS c = c == ' ' || c == '\t'
       computeHeaders fm cs =
           case cs of
             NoCaching -> []
@@ -323,8 +337,8 @@ computeFileMeta fp =
        ct <- BSL.readFile fp
        return $ FileMeta
                 { fm_lastModified =
-                      BSC.pack $ formatTime defaultTimeLocale "%a, %d-%b-%Y %X %Z" mtime
-                , fm_etag = Base16.encode (SHA1.hashlazy ct)
+                      BSC.pack $ formatTime defaultTimeLocale "%a, %d %b %Y %H:%M:%S GMT" mtime
+                , fm_etag = BS.concat ["W/\"", Base16.encode (SHA1.hashlazy ct), "\""]
                 , fm_fileName = fp
                 }
 
